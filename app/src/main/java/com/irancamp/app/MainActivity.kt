@@ -131,6 +131,8 @@ class MainActivity : AppCompatActivity() {
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
         settings.mediaPlaybackRequiresUserGesture = false
+        settings.javaScriptCanOpenWindowsAutomatically = true
+        settings.setSupportMultipleWindows(true)
         // یوزر ایجنت رو کمی سفارشی می‌کنیم تا سایت اگر خواست بین اپ و مرورگر فرق بذاره
         settings.userAgentString = settings.userAgentString + " IranCampApp/1.0"
 
