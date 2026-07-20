@@ -22,17 +22,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import android.widget.Button
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 
 class MainActivity : AppCompatActivity() {
 
-    // آدرس اصلی سایت - اگر بعداً خواستی تغییرش بدی فقط همینجا رو عوض کن
     private val BASE_URL = "https://irancamp.online/"
 
-    // دامنه‌هایی که اجازه دارن داخل خود اپ (WebView) باز بشن
-    // دامنه سایت + درگاه‌های پرداخت رایج. اگر درگاه دیگه‌ای استفاده می‌کنی، دامنه‌اش رو اضافه کن
     private val allowedDomains = listOf(
         "irancamp.online",
         "zarinpal.com",
@@ -42,7 +38,7 @@ class MainActivity : AppCompatActivity() {
         "shaparak.ir",
         "sep.shaparak.ir",
         "banktest.ir",
-        "google.com",           // برای گوگل لاگین در صورت وجود
+        "google.com",
         "accounts.google.com"
     )
 
@@ -57,17 +53,21 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (filePathCallback == null) return@registerForActivityResult
+
         val results: Array<Uri>? = if (result.resultCode == Activity.RESULT_OK) {
-            val data = result.data
-            when {
-                data?.clipData != null -> {
-                    val count = data.clipData!!.itemCount
-                    Array(count) { i -> data.clipData!!.getItemAt(i).uri }
+            result.data?.let { data ->
+                when {
+                    data.clipData != null -> {
+                        Array(data.clipData!!.itemCount) { i ->
+                            data.clipData!!.getItemAt(i).uri
+                        }
+                    }
+                    data.data != null -> arrayOf(data.data!!)
+                    else -> null
                 }
-                data?.data != null -> arrayOf(data.data!!)
-                else -> null
             }
         } else null
+
         filePathCallback?.onReceiveValue(results)
         filePathCallback = null
     }
@@ -81,6 +81,7 @@ class MainActivity : AppCompatActivity() {
         swipeRefresh = findViewById(R.id.swipeRefresh)
         progressBar = findViewById(R.id.progressBar)
         offlineLayout = findViewById(R.id.offlineLayout)
+
         findViewById<Button>(R.id.retryButton).setOnClickListener {
             if (isOnline()) {
                 offlineLayout.visibility = View.GONE
@@ -133,25 +134,26 @@ class MainActivity : AppCompatActivity() {
         settings.mediaPlaybackRequiresUserGesture = false
         settings.javaScriptCanOpenWindowsAutomatically = true
         settings.setSupportMultipleWindows(true)
-        // یوزر ایجنت رو کمی سفارشی می‌کنیم تا سایت اگر خواست بین اپ و مرورگر فرق بذاره
-        settings.userAgentString = settings.userAgentString + " IranCampApp/1.0"
+        settings.userAgentString = "${settings.userAgentString} IranCampApp/1.0"
 
-        // فعال کردن کوکی از جمله کوکی درگاه پرداخت (third-party) که برای فرآیند پرداخت لازمه
-        val cookieManager = CookieManager.getInstance()
-        cookieManager.setAcceptCookie(true)
-        cookieManager.setAcceptThirdPartyCookies(webView, true)
+        // کوکی‌ها (مهم برای درگاه‌های پرداخت)
+        CookieManager.getInstance().apply {
+            setAcceptCookie(true)
+            setAcceptThirdPartyCookies(webView, true)
+        }
 
         webView.setDownloadListener { url, _, _, _, _ ->
             try {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                startActivity(intent)
-            } catch (e: ActivityNotFoundException) {
-                // نادیده گرفتن اگر اپی برای باز کردن نبود
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            } catch (_: ActivityNotFoundException) {
             }
         }
 
         webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+            override fun shouldOverrideUrlLoading(
+                view: WebView,
+                request: WebResourceRequest
+            ): Boolean {
                 val url = request.url
                 val host = url.host ?: return false
 
@@ -161,19 +163,14 @@ class MainActivity : AppCompatActivity() {
 
                 return if (url.scheme == "http" || url.scheme == "https") {
                     if (isAllowed) {
-                        false // بذار خود WebView لودش کنه
+                        false
                     } else {
-                        // لینک خارج از سایت و درگاه‌های شناخته‌شده -> در مرورگر خارجی باز شود
-                        try {
-                            startActivity(Intent(Intent.ACTION_VIEW, url))
-                        } catch (e: ActivityNotFoundException) { }
+                        openInExternalBrowser(url)
                         true
                     }
                 } else {
-                    // لینک‌های غیر وب مثل tel: mailto: intent: (اپ بانک و ...)
-                    try {
-                        startActivity(Intent(Intent.ACTION_VIEW, url))
-                    } catch (e: ActivityNotFoundException) { }
+                    // tel:, mailto:, intent: و ...
+                    openInExternalBrowser(url)
                     true
                 }
             }
@@ -195,24 +192,22 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // توجه: خطای SSL نادیده گرفته نمی‌شود (برای امنیت پرداخت). در صورت خطا اتصال قطع می‌شود
             override fun onReceivedSslError(
                 view: WebView?,
                 handler: SslErrorHandler,
                 error: android.net.http.SslError?
             ) {
-                handler.cancel()
+                handler.cancel() // امنیت بالا برای پرداخت
             }
         }
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
-                super.onProgressChanged(view, newProgress)
                 progressBar.progress = newProgress
                 progressBar.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
             }
 
-            // برای فرم‌های آپلود عکس/فایل داخل سایت (مثلاً آپلود مدرک، آواتار)
+            // آپلود فایل / عکس
             override fun onShowFileChooser(
                 webView: WebView,
                 filePathCallback: ValueCallback<Array<Uri>>,
@@ -221,26 +216,26 @@ class MainActivity : AppCompatActivity() {
                 this@MainActivity.filePathCallback?.onReceiveValue(null)
                 this@MainActivity.filePathCallback = filePathCallback
 
-                val intent = fileChooserParams.createIntent()
                 try {
-                    fileChooserLauncher.launch(intent)
+                    fileChooserLauncher.launch(fileChooserParams.createIntent())
+                    return true
                 } catch (e: ActivityNotFoundException) {
                     this@MainActivity.filePathCallback = null
                     return false
                 }
-                return true
             }
 
-// برای صفحاتی که با target="_blank" یا window.open باز میشن (مثلاً درگاه پرداخت)
+            // مدیریت window.open و target="_blank"
             override fun onCreateWindow(
                 view: WebView,
                 isDialog: Boolean,
                 isUserGesture: Boolean,
                 resultMsg: android.os.Message
             ): Boolean {
-                val newWebView = WebView(this@MainActivity)
-                newWebView.settings.javaScriptEnabled = true
-                newWebView.settings.domStorageEnabled = true
+                val newWebView = WebView(this@MainActivity).apply {
+                    settings.javaScriptEnabled = true
+                    settings.domStorageEnabled = true
+                }
 
                 val transport = resultMsg.obj as WebView.WebViewTransport
                 transport.webView = newWebView
@@ -248,13 +243,21 @@ class MainActivity : AppCompatActivity() {
 
                 newWebView.webViewClient = object : WebViewClient() {
                     override fun doUpdateVisitedHistory(v: WebView, url: String, isReload: Boolean) {
-                        // آدرس نهایی صفحه‌ی جدید (حتی اگه با POST باز شده باشه) رو می‌گیریم
-                        // و توی همون WebView اصلی اپ لودش می‌کنیم
+                        // برگرداندن صفحه به WebView اصلی
                         view.loadUrl(url)
                     }
                 }
                 return true
             }
+        }
+    }
+
+    private fun openInExternalBrowser(uri: Uri) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, uri))
+        } catch (_: ActivityNotFoundException) {
+        }
+    }
 
     private fun isOnline(): Boolean {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
