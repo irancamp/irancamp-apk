@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ایران کمپ</string>
+    <string name="app_name">IRANCAMP.online</string>
     <string name="base_url">https://irancamp.online/</string>
     <string name="no_internet">اتصال اینترنت برقرار نیست</string>
     <string name="retry">تلاش مجدد</string>
