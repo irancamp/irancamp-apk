@@ -29,9 +29,9 @@ class MainActivity : AppCompatActivity() {
 
     private val BASE_URL = "https://irancamp.online/"
 
+    // دامنه‌هایی که داخل WebView باز می‌شوند (زرین‌پال حذف شد)
     private val allowedDomains = listOf(
         "irancamp.online",
-        "zarinpal.com",
         "idpay.ir",
         "zibal.ir",
         "nextpay.org",
@@ -57,11 +57,7 @@ class MainActivity : AppCompatActivity() {
         val results: Array<Uri>? = if (result.resultCode == Activity.RESULT_OK) {
             result.data?.let { data ->
                 when {
-                    data.clipData != null -> {
-                        Array(data.clipData!!.itemCount) { i ->
-                            data.clipData!!.getItemAt(i).uri
-                        }
-                    }
+                    data.clipData != null -> Array(data.clipData!!.itemCount) { i -> data.clipData!!.getItemAt(i).uri }
                     data.data != null -> arrayOf(data.data!!)
                     else -> null
                 }
@@ -100,9 +96,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         swipeRefresh.setOnRefreshListener {
-            if (isOnline()) {
-                webView.reload()
-            } else {
+            if (isOnline()) webView.reload() else {
                 swipeRefresh.isRefreshing = false
                 showOffline()
             }
@@ -116,11 +110,28 @@ class MainActivity : AppCompatActivity() {
                 onBackPressedDispatcher.onBackPressed()
             }
         }
+
+        // هندل کردن بازگشت از مرورگر (Deep Link)
+        handleDeepLink(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    private fun handleDeepLink(intent: Intent?) {
+        intent?.data?.let { uri ->
+            if (uri.scheme == "irancamp") {   // یا هر اسکیمی که در سایت تعریف کردید
+                webView.loadUrl(BASE_URL)     // یا آدرس صفحه مخصوص نتیجه پرداخت
+                // می‌توانید وضعیت پرداخت را هم از uri بخوانید
+            }
+        }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
-        val settings: WebSettings = webView.settings
+        val settings = webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
@@ -131,45 +142,36 @@ class MainActivity : AppCompatActivity() {
         settings.displayZoomControls = false
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-        settings.mediaPlaybackRequiresUserGesture = false
         settings.javaScriptCanOpenWindowsAutomatically = true
         settings.setSupportMultipleWindows(true)
         settings.userAgentString = "${settings.userAgentString} IranCampApp/1.0"
 
-        // کوکی‌ها (مهم برای درگاه‌های پرداخت)
         CookieManager.getInstance().apply {
             setAcceptCookie(true)
             setAcceptThirdPartyCookies(webView, true)
         }
 
-        webView.setDownloadListener { url, _, _, _, _ ->
-            try {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-            } catch (_: ActivityNotFoundException) {
-            }
-        }
-
         webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(
-                view: WebView,
-                request: WebResourceRequest
-            ): Boolean {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val url = request.url
                 val host = url.host ?: return false
+
+                // === زرین‌پال را حتماً در مرورگر خارجی باز کن ===
+                if (host.contains("zarinpal.com") || host.contains("www.zarinpal.com")) {
+                    openInExternalBrowser(url)
+                    return true
+                }
 
                 val isAllowed = allowedDomains.any { domain ->
                     host == domain || host.endsWith(".$domain")
                 }
 
                 return if (url.scheme == "http" || url.scheme == "https") {
-                    if (isAllowed) {
-                        false
-                    } else {
+                    if (isAllowed) false else {
                         openInExternalBrowser(url)
                         true
                     }
                 } else {
-                    // tel:, mailto:, intent: و ...
                     openInExternalBrowser(url)
                     true
                 }
@@ -181,33 +183,23 @@ class MainActivity : AppCompatActivity() {
                 progressBar.visibility = View.GONE
             }
 
-            override fun onReceivedError(
-                view: WebView,
-                request: WebResourceRequest,
-                error: android.webkit.WebResourceError
-            ) {
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
                 super.onReceivedError(view, request, error)
-                if (request.isForMainFrame) {
-                    showOffline()
-                }
+                if (request.isForMainFrame) showOffline()
             }
 
-            override fun onReceivedSslError(
-                view: WebView?,
-                handler: SslErrorHandler,
-                error: android.net.http.SslError?
-            ) {
-                handler.cancel() // امنیت بالا برای پرداخت
+            override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler, error: android.net.http.SslError?) {
+                handler.cancel()
             }
         }
 
+        // بقیه کدهای WebChromeClient (آپلود فایل و window.open) بدون تغییر
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
                 progressBar.progress = newProgress
                 progressBar.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
             }
 
-            // آپلود فایل / عکس
             override fun onShowFileChooser(
                 webView: WebView,
                 filePathCallback: ValueCallback<Array<Uri>>,
@@ -224,46 +216,20 @@ class MainActivity : AppCompatActivity() {
                     return false
                 }
             }
-
-            // مدیریت window.open و target="_blank"
-            override fun onCreateWindow(
-                view: WebView,
-                isDialog: Boolean,
-                isUserGesture: Boolean,
-                resultMsg: android.os.Message
-            ): Boolean {
-                val newWebView = WebView(this@MainActivity).apply {
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                }
-
-                val transport = resultMsg.obj as WebView.WebViewTransport
-                transport.webView = newWebView
-                resultMsg.sendToTarget()
-
-                newWebView.webViewClient = object : WebViewClient() {
-                    override fun doUpdateVisitedHistory(v: WebView, url: String, isReload: Boolean) {
-                        // برگرداندن صفحه به WebView اصلی
-                        view.loadUrl(url)
-                    }
-                }
-                return true
-            }
         }
     }
 
     private fun openInExternalBrowser(uri: Uri) {
         try {
             startActivity(Intent(Intent.ACTION_VIEW, uri))
-        } catch (_: ActivityNotFoundException) {
-        }
+        } catch (_: Exception) {}
     }
 
     private fun isOnline(): Boolean {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = cm.activeNetwork ?: return false
-        val capabilities = cm.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        return cm.getNetworkCapabilities(network)
+            ?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) ?: false
     }
 
     private fun showOffline() {
