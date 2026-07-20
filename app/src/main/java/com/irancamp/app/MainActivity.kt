@@ -231,7 +231,7 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
 
-            // برای صفحاتی که با target="_blank" یا window.open باز میشن (مثلاً درگاه پرداخت)
+// برای صفحاتی که با target="_blank" یا window.open باز میشن (مثلاً درگاه پرداخت)
             override fun onCreateWindow(
                 view: WebView,
                 isDialog: Boolean,
@@ -239,20 +239,22 @@ class MainActivity : AppCompatActivity() {
                 resultMsg: android.os.Message
             ): Boolean {
                 val newWebView = WebView(this@MainActivity)
+                newWebView.settings.javaScriptEnabled = true
+                newWebView.settings.domStorageEnabled = true
+
                 val transport = resultMsg.obj as WebView.WebViewTransport
                 transport.webView = newWebView
                 resultMsg.sendToTarget()
 
                 newWebView.webViewClient = object : WebViewClient() {
-                    override fun shouldOverrideUrlLoading(v: WebView, request: WebResourceRequest): Boolean {
-                        view.loadUrl(request.url.toString())
-                        return true
+                    override fun doUpdateVisitedHistory(v: WebView, url: String, isReload: Boolean) {
+                        // آدرس نهایی صفحه‌ی جدید (حتی اگه با POST باز شده باشه) رو می‌گیریم
+                        // و توی همون WebView اصلی اپ لودش می‌کنیم
+                        view.loadUrl(url)
                     }
                 }
                 return true
             }
-        }
-    }
 
     private fun isOnline(): Boolean {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
