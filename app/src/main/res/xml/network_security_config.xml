@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- HTTPS به irancamp.online و زیردامنه‌هاش مجاز است -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">irancamp.online</domain>
+    </domain-config>
+
+    <!-- درگاه‌های پرداخت رایج ایرانی برای ریدایرکت پرداخت - در صورت نیاز دامنه درگاهت را اضافه/حذف کن -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">zarinpal.com</domain>
+        <domain includeSubdomains="true">idpay.ir</domain>
+        <domain includeSubdomains="true">zibal.ir</domain>
+        <domain includeSubdomains="true">nextpay.org</domain>
+        <domain includeSubdomains="true">shaparak.ir</domain>
+    </domain-config>
+</network-security-config>
