@@ -89,11 +89,37 @@ class MainActivity : AppCompatActivity() {
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)
+        } else if (intent?.data != null && intent.data?.scheme == "irancamp") {
+            // اپ از طریق لینک بازگشت پرداخت باز شده
+            handleDeepLink(intent)
         } else if (isOnline()) {
             webView.loadUrl(BASE_URL)
         } else {
             showOffline()
         }
+
+        // وقتی اپ از قبل باز باشه (launchMode singleTask) و از لینک irancamp:// دوباره فراخوانی بشه
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.data != null && intent.data?.scheme == "irancamp") {
+            handleDeepLink(intent)
+        }
+    }
+
+    // لینک irancamp://order-received?order_id=X&key=Y رو می‌گیره و صفحه‌ی نتیجه‌ی سفارش رو توی WebView لود می‌کنه
+    private fun handleDeepLink(intent: Intent) {
+        val data: Uri = intent.data ?: return
+        val orderId = data.getQueryParameter("order_id")
+        val key = data.getQueryParameter("key")
+
+        val targetUrl = if (orderId != null && key != null) {
+            "${BASE_URL}checkout/order-received/$orderId/?key=$key"
+        } else {
+            BASE_URL
+        }
+        webView.loadUrl(targetUrl)
+    }
 
         swipeRefresh.setOnRefreshListener {
             if (isOnline()) webView.reload() else {
