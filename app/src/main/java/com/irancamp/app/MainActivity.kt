@@ -22,16 +22,19 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 
 class MainActivity : AppCompatActivity() {
 
+    // آدرس اصلی سایت - اگر بعداً خواستی تغییرش بدی فقط همینجا رو عوض کن
     private val BASE_URL = "https://irancamp.online/"
 
-    // دامنه‌هایی که داخل WebView باز می‌شوند (زرین‌پال حذف شد)
+    // دامنه‌هایی که اجازه دارن داخل خود اپ (WebView) باز بشن
     private val allowedDomains = listOf(
         "irancamp.online",
+        "zarinpal.com",
         "idpay.ir",
         "zibal.ir",
         "nextpay.org",
@@ -53,17 +56,17 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (filePathCallback == null) return@registerForActivityResult
-
         val results: Array<Uri>? = if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.let { data ->
-                when {
-                    data.clipData != null -> Array(data.clipData!!.itemCount) { i -> data.clipData!!.getItemAt(i).uri }
-                    data.data != null -> arrayOf(data.data!!)
-                    else -> null
+            val data = result.data
+            when {
+                data?.clipData != null -> {
+                    val count = data.clipData!!.itemCount
+                    Array(count) { i -> data.clipData!!.getItemAt(i).uri }
                 }
+                data?.data != null -> arrayOf(data.data!!)
+                else -> null
             }
         } else null
-
         filePathCallback?.onReceiveValue(results)
         filePathCallback = null
     }
@@ -77,7 +80,6 @@ class MainActivity : AppCompatActivity() {
         swipeRefresh = findViewById(R.id.swipeRefresh)
         progressBar = findViewById(R.id.progressBar)
         offlineLayout = findViewById(R.id.offlineLayout)
-
         findViewById<Button>(R.id.retryButton).setOnClickListener {
             if (isOnline()) {
                 offlineLayout.visibility = View.GONE
@@ -98,7 +100,26 @@ class MainActivity : AppCompatActivity() {
             showOffline()
         }
 
-        // وقتی اپ از قبل باز باشه (launchMode singleTask) و از لینک irancamp:// دوباره فراخوانی بشه
+        swipeRefresh.setOnRefreshListener {
+            if (isOnline()) {
+                webView.reload()
+            } else {
+                swipeRefresh.isRefreshing = false
+                showOffline()
+            }
+        }
+
+        onBackPressedDispatcher.addCallback(this) {
+            if (webView.canGoBack()) {
+                webView.goBack()
+            } else {
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        }
+    }
+
+    // وقتی اپ از قبل باز باشه (launchMode singleTask) و از لینک irancamp:// دوباره فراخوانی بشه
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -121,43 +142,9 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(targetUrl)
     }
 
-        swipeRefresh.setOnRefreshListener {
-            if (isOnline()) webView.reload() else {
-                swipeRefresh.isRefreshing = false
-                showOffline()
-            }
-        }
-
-        onBackPressedDispatcher.addCallback(this) {
-            if (webView.canGoBack()) {
-                webView.goBack()
-            } else {
-                isEnabled = false
-                onBackPressedDispatcher.onBackPressed()
-            }
-        }
-
-        // هندل کردن بازگشت از مرورگر (Deep Link)
-        handleDeepLink(intent)
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        handleDeepLink(intent)
-    }
-
-    private fun handleDeepLink(intent: Intent?) {
-        intent?.data?.let { uri ->
-            if (uri.scheme == "irancamp") {   // یا هر اسکیمی که در سایت تعریف کردید
-                webView.loadUrl(BASE_URL)     // یا آدرس صفحه مخصوص نتیجه پرداخت
-                // می‌توانید وضعیت پرداخت را هم از uri بخوانید
-            }
-        }
-    }
-
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
-        val settings = webView.settings
+        val settings: WebSettings = webView.settings
         settings.javaScriptEnabled = true
         settings.domStorageEnabled = true
         settings.databaseEnabled = true
@@ -168,13 +155,20 @@ class MainActivity : AppCompatActivity() {
         settings.displayZoomControls = false
         settings.cacheMode = WebSettings.LOAD_DEFAULT
         settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+        settings.mediaPlaybackRequiresUserGesture = false
         settings.javaScriptCanOpenWindowsAutomatically = true
         settings.setSupportMultipleWindows(true)
-        settings.userAgentString = "${settings.userAgentString} IranCampApp/1.0"
+        settings.userAgentString = settings.userAgentString + " IranCampApp/1.0"
 
-        CookieManager.getInstance().apply {
-            setAcceptCookie(true)
-            setAcceptThirdPartyCookies(webView, true)
+        val cookieManager = CookieManager.getInstance()
+        cookieManager.setAcceptCookie(true)
+        cookieManager.setAcceptThirdPartyCookies(webView, true)
+
+        webView.setDownloadListener { url, _, _, _, _ ->
+            try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                startActivity(intent)
+            } catch (e: ActivityNotFoundException) { }
         }
 
         webView.webViewClient = object : WebViewClient() {
@@ -182,23 +176,23 @@ class MainActivity : AppCompatActivity() {
                 val url = request.url
                 val host = url.host ?: return false
 
-                // === زرین‌پال را حتماً در مرورگر خارجی باز کن ===
-                if (host.contains("zarinpal.com") || host.contains("www.zarinpal.com")) {
-                    openInExternalBrowser(url)
-                    return true
-                }
-
                 val isAllowed = allowedDomains.any { domain ->
                     host == domain || host.endsWith(".$domain")
                 }
 
                 return if (url.scheme == "http" || url.scheme == "https") {
-                    if (isAllowed) false else {
-                        openInExternalBrowser(url)
+                    if (isAllowed) {
+                        false
+                    } else {
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, url))
+                        } catch (e: ActivityNotFoundException) { }
                         true
                     }
                 } else {
-                    openInExternalBrowser(url)
+                    try {
+                        startActivity(Intent(Intent.ACTION_VIEW, url))
+                    } catch (e: ActivityNotFoundException) { }
                     true
                 }
             }
@@ -209,19 +203,29 @@ class MainActivity : AppCompatActivity() {
                 progressBar.visibility = View.GONE
             }
 
-            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: android.webkit.WebResourceError) {
+            override fun onReceivedError(
+                view: WebView,
+                request: WebResourceRequest,
+                error: android.webkit.WebResourceError
+            ) {
                 super.onReceivedError(view, request, error)
-                if (request.isForMainFrame) showOffline()
+                if (request.isForMainFrame) {
+                    showOffline()
+                }
             }
 
-            override fun onReceivedSslError(view: WebView?, handler: SslErrorHandler, error: android.net.http.SslError?) {
+            override fun onReceivedSslError(
+                view: WebView?,
+                handler: SslErrorHandler,
+                error: android.net.http.SslError?
+            ) {
                 handler.cancel()
             }
         }
 
-        // بقیه کدهای WebChromeClient (آپلود فایل و window.open) بدون تغییر
         webView.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
+                super.onProgressChanged(view, newProgress)
                 progressBar.progress = newProgress
                 progressBar.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
             }
@@ -234,28 +238,45 @@ class MainActivity : AppCompatActivity() {
                 this@MainActivity.filePathCallback?.onReceiveValue(null)
                 this@MainActivity.filePathCallback = filePathCallback
 
+                val intent = fileChooserParams.createIntent()
                 try {
-                    fileChooserLauncher.launch(fileChooserParams.createIntent())
-                    return true
+                    fileChooserLauncher.launch(intent)
                 } catch (e: ActivityNotFoundException) {
                     this@MainActivity.filePathCallback = null
                     return false
                 }
+                return true
+            }
+
+            override fun onCreateWindow(
+                view: WebView,
+                isDialog: Boolean,
+                isUserGesture: Boolean,
+                resultMsg: android.os.Message
+            ): Boolean {
+                val newWebView = WebView(this@MainActivity)
+                newWebView.settings.javaScriptEnabled = true
+                newWebView.settings.domStorageEnabled = true
+
+                val transport = resultMsg.obj as WebView.WebViewTransport
+                transport.webView = newWebView
+                resultMsg.sendToTarget()
+
+                newWebView.webViewClient = object : WebViewClient() {
+                    override fun doUpdateVisitedHistory(v: WebView, url: String, isReload: Boolean) {
+                        view.loadUrl(url)
+                    }
+                }
+                return true
             }
         }
-    }
-
-    private fun openInExternalBrowser(uri: Uri) {
-        try {
-            startActivity(Intent(Intent.ACTION_VIEW, uri))
-        } catch (_: Exception) {}
     }
 
     private fun isOnline(): Boolean {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = cm.activeNetwork ?: return false
-        return cm.getNetworkCapabilities(network)
-            ?.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET) ?: false
+        val capabilities = cm.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
 
     private fun showOffline() {
