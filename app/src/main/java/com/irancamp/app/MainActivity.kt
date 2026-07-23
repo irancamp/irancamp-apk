@@ -34,13 +34,6 @@ class MainActivity : AppCompatActivity() {
     // دامنه‌هایی که اجازه دارن داخل خود اپ (WebView) باز بشن
     private val allowedDomains = listOf(
         "irancamp.online",
-        "zarinpal.com",
-        "idpay.ir",
-        "zibal.ir",
-        "nextpay.org",
-        "shaparak.ir",
-        "sep.shaparak.ir",
-        "banktest.ir",
         "google.com",
         "accounts.google.com"
     )
