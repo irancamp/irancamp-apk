@@ -25,6 +25,7 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import com.google.android.material.card.MaterialCardView
 
 class MainActivity : AppCompatActivity() {
 
@@ -46,6 +47,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var progressBar: ProgressBar
     private lateinit var offlineLayout: LinearLayout
     private lateinit var loadingLayout: LinearLayout
+    private lateinit var backButtonCard: MaterialCardView
 
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
 
@@ -78,12 +80,20 @@ class MainActivity : AppCompatActivity() {
         progressBar = findViewById(R.id.progressBar)
         offlineLayout = findViewById(R.id.offlineLayout)
         loadingLayout = findViewById(R.id.loadingLayout)
+        backButtonCard = findViewById(R.id.backButtonCard)
 
         findViewById<Button>(R.id.retryButton).setOnClickListener {
             if (isOnline()) {
                 offlineLayout.visibility = View.GONE
                 showLoadingOverlay()
                 webView.reload()
+            }
+        }
+
+        // دکمه‌ی بازگشت گوشه‌ی صفحه - دقیقاً همون رفتار دکمه‌ی بک اندروید/مرورگر: یه پله توی تاریخچه‌ی وب‌ویو برمی‌گرده
+        backButtonCard.setOnClickListener {
+            if (webView.canGoBack()) {
+                webView.goBack()
             }
         }
 
@@ -162,6 +172,12 @@ class MainActivity : AppCompatActivity() {
             .start()
     }
 
+    // دکمه‌ی بازگشت گوشه رو فقط وقتی نشون می‌ده که توی وب‌ویو صفحه‌ای برای برگشتن وجود داشته باشه
+    // (دقیقاً مثل رفتار دکمه‌ی بک مرورگر که توی اولین صفحه غیرفعال/مخفیه)
+    private fun updateBackButtonVisibility() {
+        backButtonCard.visibility = if (webView.canGoBack()) View.VISIBLE else View.GONE
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         val settings: WebSettings = webView.settings
@@ -221,6 +237,7 @@ class MainActivity : AppCompatActivity() {
                 super.onPageStarted(view, url, favicon)
                 // شروع لود هر صفحه (چه اولین بار، چه رفتن به صفحه‌ی دیگه‌ی سایت) -> نمایش لودینگ نارنجی
                 showLoadingOverlay()
+                updateBackButtonVisibility()
             }
 
             override fun onPageFinished(view: WebView, url: String?) {
@@ -229,6 +246,7 @@ class MainActivity : AppCompatActivity() {
                 progressBar.visibility = View.GONE
                 // فالبک: اگه به هر دلیلی onProgressChanged به ۹۵٪ نرسیده باشه، همینجا مخفی می‌کنیم
                 hideLoadingOverlay()
+                updateBackButtonVisibility()
             }
 
             override fun onReceivedError(
