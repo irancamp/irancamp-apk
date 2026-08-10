@@ -4,4 +4,5 @@
     <string name="base_url">https://irancamp.online/</string>
     <string name="no_internet">اتصال اینترنت برقرار نیست</string>
     <string name="retry">تلاش مجدد</string>
+    <string name="back">بازگشت</string>
 </resources>
