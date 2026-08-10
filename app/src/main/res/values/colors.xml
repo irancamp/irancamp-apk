@@ -4,4 +4,5 @@
     <color name="brand_primary_dark">#123D28</color>
     <color name="white">#FFFFFF</color>
     <color name="black">#000000</color>
+    <color name="loading_orange">#FF7A00</color>
 </resources>
