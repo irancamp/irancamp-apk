@@ -38,10 +38,14 @@ class MainActivity : AppCompatActivity() {
         "accounts.google.com"
     )
 
+    // درصدی که به اون رسیدیم، لودینگ (اسپلش / بین صفحات) مخفی می‌شه
+    private val HIDE_LOADING_AT_PROGRESS = 95
+
     private lateinit var webView: WebView
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var progressBar: ProgressBar
     private lateinit var offlineLayout: LinearLayout
+    private lateinit var loadingLayout: LinearLayout
 
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
 
@@ -73,9 +77,12 @@ class MainActivity : AppCompatActivity() {
         swipeRefresh = findViewById(R.id.swipeRefresh)
         progressBar = findViewById(R.id.progressBar)
         offlineLayout = findViewById(R.id.offlineLayout)
+        loadingLayout = findViewById(R.id.loadingLayout)
+
         findViewById<Button>(R.id.retryButton).setOnClickListener {
             if (isOnline()) {
                 offlineLayout.visibility = View.GONE
+                showLoadingOverlay()
                 webView.reload()
             }
         }
@@ -135,6 +142,26 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(targetUrl)
     }
 
+    // لودینگ تمام‌صفحه (لوگو + اسپینر نارنجی) رو نشون می‌ده - هم برای اسپلش اولیه، هم بین صفحات
+    private fun showLoadingOverlay() {
+        loadingLayout.animate().cancel()
+        loadingLayout.alpha = 1f
+        loadingLayout.visibility = View.VISIBLE
+    }
+
+    // لودینگ تمام‌صفحه رو با یه فید محو می‌کنه
+    private fun hideLoadingOverlay() {
+        if (loadingLayout.visibility != View.VISIBLE) return
+        loadingLayout.animate()
+            .alpha(0f)
+            .setDuration(250)
+            .withEndAction {
+                loadingLayout.visibility = View.GONE
+                loadingLayout.alpha = 1f
+            }
+            .start()
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun setupWebView() {
         val settings: WebSettings = webView.settings
@@ -190,10 +217,18 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+                super.onPageStarted(view, url, favicon)
+                // شروع لود هر صفحه (چه اولین بار، چه رفتن به صفحه‌ی دیگه‌ی سایت) -> نمایش لودینگ نارنجی
+                showLoadingOverlay()
+            }
+
             override fun onPageFinished(view: WebView, url: String?) {
                 super.onPageFinished(view, url)
                 swipeRefresh.isRefreshing = false
                 progressBar.visibility = View.GONE
+                // فالبک: اگه به هر دلیلی onProgressChanged به ۹۵٪ نرسیده باشه، همینجا مخفی می‌کنیم
+                hideLoadingOverlay()
             }
 
             override fun onReceivedError(
@@ -203,6 +238,7 @@ class MainActivity : AppCompatActivity() {
             ) {
                 super.onReceivedError(view, request, error)
                 if (request.isForMainFrame) {
+                    hideLoadingOverlay()
                     showOffline()
                 }
             }
@@ -221,6 +257,11 @@ class MainActivity : AppCompatActivity() {
                 super.onProgressChanged(view, newProgress)
                 progressBar.progress = newProgress
                 progressBar.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
+
+                // به محض رسیدن به ۹۵٪ لود صفحه، لودینگ نارنجی مخفی می‌شه و صفحه نمایش داده می‌شه
+                if (newProgress >= HIDE_LOADING_AT_PROGRESS) {
+                    hideLoadingOverlay()
+                }
             }
 
             override fun onShowFileChooser(
@@ -275,6 +316,7 @@ class MainActivity : AppCompatActivity() {
     private fun showOffline() {
         offlineLayout.visibility = View.VISIBLE
         progressBar.visibility = View.GONE
+        hideLoadingOverlay()
         swipeRefresh.isRefreshing = false
     }
 
