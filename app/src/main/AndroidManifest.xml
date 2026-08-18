@@ -3,8 +3,6 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
 
     <application
         android:name=".App"
@@ -21,7 +19,7 @@
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:launchMode="singleTask"
-            android:theme="@style/Theme.IranCamp">
+            android:theme="@style/Theme.App.Starting">
             <!-- Launch from home screen -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -33,6 +31,16 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="irancamp" />
+            </intent-filter>
+            <!-- App Links: باز شدن مستقیم لینک‌های irancamp.online داخل اپ -->
+            <!-- نیاز به فایل assetlinks.json در https://irancamp.online/.well-known/assetlinks.json دارد -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="irancamp.online" />
             </intent-filter>
         </activity>
 
