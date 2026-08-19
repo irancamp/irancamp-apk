@@ -33,24 +33,13 @@ import com.google.android.material.card.MaterialCardView
 
 class MainActivity : AppCompatActivity() {
 
-    // آدرس اصلی سایت - اگر بعداً خواستی تغییرش بدی فقط همینجا رو عوض کن
     private val BASE_URL = "https://irancamp.online/"
-
-    // آدرس صفحه‌ی علاقه‌مندی‌ها - خود سایت اگر کاربر وارد نشده باشد به صفحه‌ی ورود ریدایرکت می‌کند
     private val FAVORITE_URL = "https://irancamp.online/account/favorite_camps/"
 
-    // الگوی تشخیص صفحات محصول/تور ووکامرس: irancamp.online/product/xxx/
-    private val PRODUCT_URL_REGEX = Regex(
-        "^https://irancamp\\.online/product/[^/?#]+/?(?:[?#].*)?$",
-        RegexOption.IGNORE_CASE
-    )
-
-    // دامنه‌هایی که اجازه دارن داخل خود اپ (WebView) باز بشن
     private val allowedDomains = listOf(
         "irancamp.online"
     )
 
-    // درصدی که به اون رسیدیم، لودینگ (اسپلش / بین صفحات) مخفی می‌شه
     private val HIDE_LOADING_AT_PROGRESS = 95
 
     private lateinit var webView: WebView
@@ -60,19 +49,14 @@ class MainActivity : AppCompatActivity() {
     private lateinit var loadingLayout: LinearLayout
     private lateinit var backButtonCard: MaterialCardView
 
-    // نوار جستجوی خانه
     private lateinit var homeSearchBar: MaterialCardView
     private lateinit var homeSearchInput: EditText
     private lateinit var homeSearchIcon: ImageView
 
-    // نوار ابزار صفحه محصول
-    private lateinit var productTopBar: LinearLayout
-    private lateinit var productBackButtonCard: MaterialCardView
     private lateinit var shareButtonCard: MaterialCardView
     private lateinit var favoriteButtonCard: MaterialCardView
 
-    // نوع صفحه‌ی فعلی، برای تصمیم‌گیری در مورد نمایش هدرها
-    private enum class PageMode { HOME, PRODUCT, OTHER }
+    private enum class PageMode { HOME, OTHER }
     private var currentPageMode: PageMode = PageMode.OTHER
 
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
@@ -98,7 +82,6 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
-        // نصب Splash Screen استاندارد اندروید - باید قبل از super.onCreate و setContentView باشه
         installSplashScreen()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -114,8 +97,6 @@ class MainActivity : AppCompatActivity() {
         homeSearchInput = findViewById(R.id.homeSearchInput)
         homeSearchIcon = findViewById(R.id.homeSearchIcon)
 
-        productTopBar = findViewById(R.id.productTopBar)
-        productBackButtonCard = findViewById(R.id.productBackButtonCard)
         shareButtonCard = findViewById(R.id.shareButtonCard)
         favoriteButtonCard = findViewById(R.id.favoriteButtonCard)
 
@@ -127,32 +108,20 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // دکمه‌ی بازگشت شناور (صفحات غیر از محصول) - یه پله توی تاریخچه‌ی وب‌ویو برمی‌گرده
         backButtonCard.setOnClickListener {
             if (webView.canGoBack()) {
                 webView.goBack()
             }
         }
 
-        // دکمه‌ی بازگشت داخل نوار ابزار محصول - همون رفتار، فقط جای دیگه
-        productBackButtonCard.setOnClickListener {
-            if (webView.canGoBack()) {
-                webView.goBack()
-            }
-        }
-
-        // دکمه‌ی اشتراک‌گذاری - از سیستم Share بومی اندروید استفاده می‌کنه
         shareButtonCard.setOnClickListener {
             shareCurrentPage()
         }
 
-        // دکمه‌ی علاقه‌مندی - می‌ره به صفحه‌ی علاقه‌مندی‌های سایت
-        // (خود سایت اگه کاربر وارد نشده باشه به صفحه‌ی ورود ریدایرکت می‌کنه)
         favoriteButtonCard.setOnClickListener {
             webView.loadUrl(FAVORITE_URL)
         }
 
-        // نوار جستجوی خانه: هم دکمه‌ی اینتر کیبورد هم آیکون ذره‌بین کار می‌کنن
         homeSearchInput.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEARCH) {
                 performHomeSearch()
@@ -192,14 +161,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // وقتی اپ از قبل باز باشه (launchMode singleTask) و از لینکی دوباره فراخوانی بشه
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleLaunchIntent(intent, isNewIntent = true)
     }
 
-    // تصمیم می‌گیره اپ با چه آدرسی باز بشه: لینک بازگشت از درگاه، App Link سایت، یا صفحه‌ی خانه
     private fun handleLaunchIntent(intent: Intent?, isNewIntent: Boolean = false) {
         val data = intent?.data
 
@@ -208,11 +175,9 @@ class MainActivity : AppCompatActivity() {
                 handlePaymentDeepLink(intent)
             }
             data != null && (data.scheme == "https" || data.scheme == "http") && data.host == "irancamp.online" -> {
-                // App Link: کاربر روی یه لینک irancamp.online زده (مثلاً از تلگرام) و اپ مستقیم بازش می‌کنه
                 webView.loadUrl(data.toString())
             }
             !isNewIntent -> {
-                // اجرای عادی اپ از صفحه‌ی هوم
                 if (isOnline()) {
                     webView.loadUrl(BASE_URL)
                 } else {
@@ -222,7 +187,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // لینک irancamp://order-received?order_id=X&key=Y رو می‌گیره و صفحه‌ی نتیجه‌ی سفارش رو توی WebView لود می‌کنه
     private fun handlePaymentDeepLink(intent: Intent) {
         val data: Uri = intent.data ?: return
         val orderId = data.getQueryParameter("order_id")
@@ -236,7 +200,6 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(targetUrl)
     }
 
-    // جستجوی صفحه‌ی خانه: متن رو می‌گیره و به آدرس جستجوی سایت هدایت می‌کنه
     private fun performHomeSearch() {
         val query = homeSearchInput.text?.toString()?.trim().orEmpty()
         if (query.isEmpty()) {
@@ -253,7 +216,6 @@ class MainActivity : AppCompatActivity() {
         imm.hideSoftInputFromWindow(homeSearchInput.windowToken, 0)
     }
 
-    // اشتراک‌گذاری لینک صفحه‌ی فعلی با سیستم Share بومی اندروید
     private fun shareCurrentPage() {
         val currentUrl = webView.url ?: BASE_URL
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
@@ -265,46 +227,25 @@ class MainActivity : AppCompatActivity() {
         } catch (e: ActivityNotFoundException) { }
     }
 
-    // آدرس رو با الگوهای صفحه خانه/محصول مقایسه می‌کنه و نوع صفحه رو برمی‌گردونه
     private fun detectPageMode(url: String?): PageMode {
         if (url == null) return PageMode.OTHER
         val normalized = url.trim()
         val homeVariants = listOf(BASE_URL, BASE_URL.trimEnd('/'))
-        return when {
-            homeVariants.contains(normalized) -> PageMode.HOME
-            PRODUCT_URL_REGEX.matches(normalized) -> PageMode.PRODUCT
-            else -> PageMode.OTHER
-        }
+        return if (homeVariants.contains(normalized)) PageMode.HOME else PageMode.OTHER
     }
 
-    // بر اساس نوع صفحه، نوار جستجو / نوار ابزار محصول / هیچ‌کدام رو نشون می‌ده
     private fun updateTopBarForUrl(url: String?) {
         currentPageMode = detectPageMode(url)
-        when (currentPageMode) {
-            PageMode.HOME -> {
-                homeSearchBar.visibility = View.VISIBLE
-                productTopBar.visibility = View.GONE
-            }
-            PageMode.PRODUCT -> {
-                homeSearchBar.visibility = View.GONE
-                productTopBar.visibility = View.VISIBLE
-            }
-            PageMode.OTHER -> {
-                homeSearchBar.visibility = View.GONE
-                productTopBar.visibility = View.GONE
-            }
-        }
+        homeSearchBar.visibility = if (currentPageMode == PageMode.HOME) View.VISIBLE else View.GONE
         updateBackButtonVisibility()
     }
 
-    // لودینگ تمام‌صفحه (لوگو + اسپینر نارنجی) رو نشون می‌ده - هم برای اسپلش اولیه، هم بین صفحات
     private fun showLoadingOverlay() {
         loadingLayout.animate().cancel()
         loadingLayout.alpha = 1f
         loadingLayout.visibility = View.VISIBLE
     }
 
-    // لودینگ تمام‌صفحه رو با یه فید محو می‌کنه
     private fun hideLoadingOverlay() {
         if (loadingLayout.visibility != View.VISIBLE) return
         loadingLayout.animate()
@@ -317,12 +258,9 @@ class MainActivity : AppCompatActivity() {
             .start()
     }
 
-    // دکمه‌ی بازگشت شناور رو فقط توی صفحاتی نشون می‌ده که نه «خانه»ان نه «محصول»
-    // (خانه فقط نوار جستجو داره، محصول دکمه‌ی بازگشت خودش رو توی productTopBar داره)
     private fun updateBackButtonVisibility() {
         val canGoBack = webView.canGoBack()
-        backButtonCard.visibility =
-            if (canGoBack && currentPageMode == PageMode.OTHER) View.VISIBLE else View.GONE
+        backButtonCard.visibility = if (canGoBack) View.VISIBLE else View.INVISIBLE
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -382,7 +320,6 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
                 super.onPageStarted(view, url, favicon)
-                // شروع لود هر صفحه (چه اولین بار، چه رفتن به صفحه‌ی دیگه‌ی سایت) -> نمایش لودینگ نارنجی
                 showLoadingOverlay()
                 updateTopBarForUrl(url)
             }
@@ -391,7 +328,6 @@ class MainActivity : AppCompatActivity() {
                 super.onPageFinished(view, url)
                 swipeRefresh.isRefreshing = false
                 progressBar.visibility = View.GONE
-                // فالبک: اگه به هر دلیلی onProgressChanged به ۹۵٪ نرسیده باشه، همینجا مخفی می‌کنیم
                 hideLoadingOverlay()
                 updateTopBarForUrl(url)
             }
@@ -423,7 +359,6 @@ class MainActivity : AppCompatActivity() {
                 progressBar.progress = newProgress
                 progressBar.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
 
-                // به محض رسیدن به ۹۵٪ لود صفحه، لودینگ نارنجی مخفی می‌شه و صفحه نمایش داده می‌شه
                 if (newProgress >= HIDE_LOADING_AT_PROGRESS) {
                     hideLoadingOverlay()
                 }
