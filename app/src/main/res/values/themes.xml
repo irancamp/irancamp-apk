@@ -5,8 +5,12 @@
         <item name="colorPrimaryDark">@color/brand_primary_dark</item>
         <item name="android:statusBarColor">@color/brand_primary_dark</item>
         <item name="android:windowBackground">@color/white</item>
+        <item name="android:fontFamily">@font/iranyekan</item>
+        <item name="fontFamily">@font/iranyekan</item>
     </style>
 
+    <!-- تم Splash Screen استاندارد اندروید (androidx.core.splashscreen) -->
+    <!-- بعد از جایگزینی آیکون واقعی برند، windowSplashScreenAnimatedIcon را هم به آیکون جدید اشاره بده -->
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/white</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
