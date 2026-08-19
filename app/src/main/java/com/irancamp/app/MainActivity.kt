@@ -317,12 +317,12 @@ class MainActivity : AppCompatActivity() {
             .start()
     }
 
-    // دکمه‌ی بازگشت شناور رو فقط وقتی نشون می‌ده که صفحه از نوع «محصول» نباشه
-    // (صفحات محصول دکمه‌ی بازگشت خودشون رو در productTopBar دارن)
+    // دکمه‌ی بازگشت شناور رو فقط توی صفحاتی نشون می‌ده که نه «خانه»ان نه «محصول»
+    // (خانه فقط نوار جستجو داره، محصول دکمه‌ی بازگشت خودش رو توی productTopBar داره)
     private fun updateBackButtonVisibility() {
         val canGoBack = webView.canGoBack()
         backButtonCard.visibility =
-            if (canGoBack && currentPageMode != PageMode.PRODUCT) View.VISIBLE else View.GONE
+            if (canGoBack && currentPageMode == PageMode.OTHER) View.VISIBLE else View.GONE
     }
 
     @SuppressLint("SetJavaScriptEnabled")
