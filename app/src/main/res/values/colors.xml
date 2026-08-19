@@ -6,4 +6,5 @@
     <color name="black">#000000</color>
     <color name="loading_orange">#FF7A00</color>
     <color name="back_icon_dark">#3C3C3C</color>
+    <color name="search_border">#E0E0E0</color>
 </resources>
